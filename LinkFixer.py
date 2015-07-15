@@ -4,7 +4,7 @@ fileName = "local html source code"
 url = "Malicious URL"
 
 fileR = open(fileName, "r")
-match = re.sub(r'(?<=<a href=")[^"]*', "Malicious Link", File.read())
+match = re.sub(r'(?<=<a href=")[^"]*', "Malicious Link", fileR.read())
 fileR.close()
 
 fileW = open(fileName, "w")
