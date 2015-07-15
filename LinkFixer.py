@@ -1,12 +1,14 @@
-# -*- coding: cp1252 -*-
+# -*- coding: utf-8 -*-
+
 import re
 
-fileName = "ebay.html"
+fileName = "24hourfitness.html"
 url = "Malicious URL"
 
 fileR = open(fileName, "r")
 match = re.sub(r'(?<=<a href=)(\s*)?"[^"]*', "\"Malicious Link", fileR.read())
-match = re.sub('Â', '', match)
+match = re.sub('Â|\xAE|\xA9', '', match)
+
 fileR.close()
 
 fileW = open(fileName, "w")
