@@ -1,10 +1,10 @@
 import re
 
-fileName = "local html source code"
+fileName = "amazon.html"
 url = "Malicious URL"
 
 fileR = open(fileName, "r")
-match = re.sub(r'(?<=<a href=")[^"]*', "Malicious Link", fileR.read())
+match = re.sub(r'(?<=<a href=)(\s*)?"[^"]*', "\"Malicious Link", fileR.read())
 fileR.close()
 
 fileW = open(fileName, "w")
