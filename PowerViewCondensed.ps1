@@ -1778,7 +1778,7 @@ function Get-DomainInfo {
     Get-NetForestTrusts
 
     #If Get-NetCurrentUser returns the username appended to the domain
-    $userName = "josh"
+    $userName = Get-NetCurrentUser
     if ($userName.contains("\")){$userName = $userName.split('\')[1]}
 
     "[+] Get-NetUser (Only for current user)`n"
