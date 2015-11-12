@@ -1,8 +1,6 @@
 import requests
 import re
 
-# Java Version
-
 def get_java():
     r = requests.get("https://java.com/en/download/")
     match = re.search(r"Version [0-9]+ Update [0-9]+", r.text, re.M|re.I)
@@ -60,6 +58,8 @@ def main():
     print get_realplayer()
     print get_shockwave()
     print get_vlc()
+
+    raw_input()
     
 
 if __name__ == "__main__":
