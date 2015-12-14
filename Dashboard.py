@@ -1,8 +1,10 @@
 import mechanize
 import cookielib
 import re
+import operator
 from bs4 import BeautifulSoup
 from sets import Set
+from datetime import datetime
 
 username = "XXXX"
 password = "XXXX"
@@ -16,7 +18,7 @@ templates = set()
 class Company:
     attacks = set()
     name = ""
-    next_attack_date = ""
+    next_attack_date = datetime(3000, 12, 12)
     
     def __init__(self, pname):
         self.attacks = set()
@@ -49,6 +51,8 @@ def setup():
     br.form["Password"] = password
     br.submit()
 
+    print "[+] Successfully logged in"
+
     return br
 
 def populate_templates(br):
@@ -78,16 +82,83 @@ def populate_templates(br):
                     attack_template = matches[0][4:len(matches[0])-14]
                     templates.add(attack_template)
     except:
+        print "[+] Gathered up templates"
         return
 
 def print_companies():
     for company_name in companies:
-        print "Company name: {0}\n".format(company_name)
+        print "Company name: {0}".format(company_name)
+        date = companies[company_name].next_attack_date
+        
+        if date.year == 3000:
+            print "Next Attack: {0}\n".format("Needs new Campaign")
+        else:
+            print "Next Attack: {0}\n".format(companies[company_name].next_attack_date)
+            
+        
         print "Attacks:"
         for attack in companies[company_name].attacks:
             print attack
 
         print "\n"
+
+def export_to_html():
+    html_file = open("dashboard.html", "w")
+    begin = """
+<!DOCTYPE html>
+<html>
+<head>
+<title>PhishThreat Dashboard</title>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+<script src="sortable.js"></script>
+<style>
+select {
+  background-color: #507FB3;
+  color: #F0F9FC;
+  font-size: 14px;
+}
+</style>
+</head>
+<body style="background-color:#0151AB">
+<table border= "1" class="sortable" align="center" style="color:#F0F9FC;font-size:20px">
+<tr style="font-weight:bold; font-size:24px; text-decoration:underline">
+<td>Name</td>
+<td>Next Attack</td>
+<td>Used Templates</td>
+<td>Available Templates</td>
+</tr>
+"""
+    html_file.write(begin)
+
+    for company_name in companies:
+        html_file.write("<tr>\n<td>{0}</td>".format(company_name))
+
+        if companies[company_name].next_attack_date.year == 3000:
+            html_file.write("<td>{0}</td>".format("Needs New Campaign"))
+        else:
+            html_file.write("<td>{0}</td>".format(companies[company_name].next_attack_date))
+                            
+        html_file.write("<td><select>")
+        for attack in companies[company_name].attacks:
+            html_file.write("<option value=\"{0}\">{0}</option>".format(attack))
+        html_file.write("</select></td>")
+
+
+        new_attacks = sorted(templates - companies[company_name].attacks)
+        html_file.write("<td><select>")
+        for attack in new_attacks:
+            html_file.write("<option value=\"{0}\">{0}</option>".format(attack))
+        html_file.write("</select></td>")
+
+    end = """
+</body>
+</html>
+"""
+    html_file.write(end)
+    html_file.close()
+
+    print "[+] Exported to HTML"
+    
 
 def get_campaigns(br):
     r = br.open(campaigns)
@@ -97,7 +168,9 @@ def get_campaigns(br):
     matches = re.findall(r"(/admin/campaign/landing/([A-Z]|[0-9]|[a-z])*)", text, re.M|re.I)
     
     for match in matches:
-        get_comp_camp_data(br, "https://xxxxxxx.com" + match[0])
+        get_comp_camp_data(br, "https://xxxxxxx.com" + match[0], True)
+
+    print "[+] Gathered active campaign data"
     
     #Check the completed campaigns
     br.open(campaigns)
@@ -112,11 +185,11 @@ def get_campaigns(br):
     matches = re.findall(r"(/admin/campaign/landing/([A-Z]|[0-9]|[a-z])*)", text, re.M|re.I)
     
     for match in matches:
-        get_comp_camp_data(br, "https://xxxxxxx.com" + match[0])
+        get_comp_camp_data(br, "https://xxxxxxx.com" + match[0], False)
 
-    print_companies()
-
-def get_comp_camp_data(br, url):
+    print "[+] Gathered completed campaign data"
+    
+def get_comp_camp_data(br, url, is_active):
     r = br.open(url)
     company_name = ""
 
@@ -131,7 +204,8 @@ def get_comp_camp_data(br, url):
     data_values = soup.find_all('p')
 
     for value in data_values:
-        value = str(value)
+        valid_date = False
+        value = str(value)       
         
         if "Customer" in value:
             old_company_name = company_name
@@ -145,15 +219,29 @@ def get_comp_camp_data(br, url):
                 if not old_company_name == "":
                     company_name = old_company_name
 
+        if is_active and "Start Date/Time" in value:
+            match = re.findall(r"[0-9]+\/[0-9]+\/[0-9]+ [0-9]+:[0-9]+ [A-Z]+", str(value), re.M|re.I)
+
+            attack_date = match[0]
+            attack_date = datetime.strptime(attack_date, "%m/%d/%Y %H:%M %p")
+
+            valid_date = attack_date > datetime.now()
+            closest_attack = attack_date < companies[company_name].next_attack_date
+
+            if valid_date and closest_attack:
+                companies[company_name].next_attack_date = attack_date
+                
+
         if "Email Template" in value and "Hacme" not in company_name:
             attack_name = value[92:len(value)-12]
             companies[company_name].attacks.add(attack_name)    
 
 def main():
     br = setup()
-    #populate_templates(br)
+    populate_templates(br)
     get_campaigns(br)
-    print_companies()
+    #print_companies()
+    export_to_html()
 
 if __name__ == "__main__":
     main()
