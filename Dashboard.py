@@ -6,8 +6,8 @@ from bs4 import BeautifulSoup
 from sets import Set
 from datetime import datetime
 
-username = "XXXX"
-password = "XXXX"
+username = "xxxx"
+password = "xxxx"
 login = "https://xxxxxxx.com/admin/security"
 campaigns = "https://xxxxxxx.com/admin/campaign/list"
 templates = "https://xxxxxxx.com/admin/emailtemplate"
@@ -18,7 +18,9 @@ templates = set()
 class Company:
     attacks = set()
     name = ""
+    campaign_link = ""
     next_attack_date = datetime(3000, 12, 12)
+    is_pending = False
     
     def __init__(self, pname):
         self.attacks = set()
@@ -117,6 +119,9 @@ select {
   color: #F0F9FC;
   font-size: 14px;
 }
+a {
+    color: white;
+}
 </style>
 </head>
 <body style="background-color:#0151AB">
@@ -131,7 +136,10 @@ select {
     html_file.write(begin)
 
     for company_name in companies:
-        html_file.write("<tr>\n<td>{0}</td>".format(company_name))
+        if companies[company_name].is_pending:
+            html_file.write("<tr>\n<td><a href=\"{0}\">[PENDING] {1}</a></td>".format(companies[company_name].campaign_link, company_name))
+        else:
+            html_file.write("<tr>\n<td><a href=\"{0}\">{1}</a></td>".format(companies[company_name].campaign_link, company_name))
 
         if companies[company_name].next_attack_date.year == 3000:
             html_file.write("<td>{0}</td>".format("Needs New Campaign"))
@@ -166,11 +174,34 @@ def get_campaigns(br):
     #First check all active campaigns
     text = r.read().replace("\"/", "https://xxxxxxx.com/")
     matches = re.findall(r"(/admin/campaign/landing/([A-Z]|[0-9]|[a-z])*)", text, re.M|re.I)
-    
+
+    x = 0
     for match in matches:
-        get_comp_camp_data(br, "https://xxxxxxx.com" + match[0], True)
+        x = x + 1
+        get_comp_camp_data(br, "https://xxxxxxx.com" + match[0], True, False)
+        print "[+] Analyzing active campaign {0}".format(x)
 
     print "[+] Gathered active campaign data"
+
+    #Check the pending campaigns
+    br.open(campaigns)
+    br.select_form(nr=0)
+    br.form["SearchCriteria.Status"] = ["P",]
+    br.submit()
+    
+    r = br.open(campaigns)
+
+    #Find each company's link
+    text = r.read().replace("\"/", "https://xxxxxxx.com/")
+    matches = re.findall(r"(/admin/campaign/landing/([A-Z]|[0-9]|[a-z])*)", text, re.M|re.I)
+
+    x = 0
+    for match in matches:
+        x = x + 1
+        get_comp_camp_data(br, "https://xxxxxxx.com" + match[0], False, True)
+        print "[+] Analyzing pending campaign {0}".format(x)
+
+    print "[+] Gathered pending campaign data"
     
     #Check the completed campaigns
     br.open(campaigns)
@@ -183,13 +214,16 @@ def get_campaigns(br):
     #Find each company's link
     text = r.read().replace("\"/", "https://xxxxxxx.com/")
     matches = re.findall(r"(/admin/campaign/landing/([A-Z]|[0-9]|[a-z])*)", text, re.M|re.I)
-    
+
+    x = 0
     for match in matches:
-        get_comp_camp_data(br, "https://xxxxxxx.com" + match[0], False)
+        x = x + 1
+        get_comp_camp_data(br, "https://xxxxxxx.com" + match[0], False, False)
+        print "[+] Analyzing complete campaign {0}".format(x)
 
     print "[+] Gathered completed campaign data"
     
-def get_comp_camp_data(br, url, is_active):
+def get_comp_camp_data(br, url, is_active, is_pending):
     r = br.open(url)
     company_name = ""
 
@@ -219,7 +253,7 @@ def get_comp_camp_data(br, url, is_active):
                 if not old_company_name == "":
                     company_name = old_company_name
 
-        if is_active and "Start Date/Time" in value:
+        if (is_active or is_pending) and "Start Date/Time" in value:
             match = re.findall(r"[0-9]+\/[0-9]+\/[0-9]+ [0-9]+:[0-9]+ [A-Z]+", str(value), re.M|re.I)
 
             attack_date = match[0]
@@ -234,7 +268,13 @@ def get_comp_camp_data(br, url, is_active):
 
         if "Email Template" in value and "Hacme" not in company_name:
             attack_name = value[92:len(value)-12]
-            companies[company_name].attacks.add(attack_name)    
+            companies[company_name].attacks.add(attack_name)
+
+    if is_active or is_pending:
+        companies[company_name].campaign_link = url
+
+    if is_pending:
+        companies[company_name].is_pending = True
 
 def main():
     br = setup()
